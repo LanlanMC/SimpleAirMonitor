@@ -6,24 +6,27 @@
 #include "src/MQ7/MQ7.h"
 #include "src/MQ135/MQ135.h"
 
+#define MULTI_SAMPLE   1000
+
 #define TFT_CS           10
 #define TFT_DC            9
 #define TFT_RST           8
 
 // 定义引脚
-#define MQ135_PIN        A1  // MQ-135 模拟输入
-#define MQ8_PIN          A4  // MQ-8   模拟输入
 #define MQ7_PIN          A0  // MQ-7   模拟输入
+#define MQ135_PIN        A1  // MQ-135 模拟输入
 #define MQ3_PIN          A3  // MQ-3   模拟输入 
-#define LM75_PIN             // LM75   模拟输入
-#define BME280_PIN       A5  // BME280 模拟输入
+#define MQ8_PIN          A4  // MQ-8   模拟输入
+#define GP2Y1014AU       A5
+#define LM75_PIN          0  // LM75   模拟输入
+#define BME280_PIN        0  // BME280 模拟输入
 #define BUZZER_PIN        5  // 蜂鸣器控制引脚
 
 // 定义安全范围
 #define CO_MAX_PPM       50  // CO          (ppm)
 #define CO2_MAX_PPM    1000  // CO₂         (ppm)
-#define ALCOHOL         3.3  // CH₂CH₃OH    (%)    note: 爆炸下限LEL
-#define H2                4  // H₂          (%)    note: 爆炸下限LEL
+#define ALCOHOL_LEL     3.3  // CH₂CH₃OH    (%)    note: 爆炸下限LEL
+#define H2_LEL            4  // H₂          (%)    note: 爆炸下限LEL
 
 
 Adafruit_ST7796S tft = Adafruit_ST7796S(TFT_CS, TFT_DC, TFT_RST);
@@ -45,7 +48,7 @@ void render_table()
   // 格线
   for (uint8_t i=1;i<10;i++)
     tft.drawFastHLine(0, 48*i, 320, 0xFFFF);
-  tft.drawFastVLine(32, 48, 432, 0xFFFF);
+  tft.drawFastVLine(32 , 48, 432, 0xFFFF);
   tft.drawFastVLine(144, 48, 432, 0xFFFF);
   tft.drawFastVLine(256, 48, 432, 0xFFFF);
   
@@ -130,12 +133,14 @@ void setup()
 
 void loop()
 {
-  float CO = 0;
-  float CO2 = 0;
-  float temperature = 0;
-  float humidity = 0;
-  float pressure = 0;
-  for (uint16_t i=0;i<1000;i++)
+  float CO           = 0;
+  float CO2          = 0;
+  float alcohol      = 0;
+  float H2           = 0;
+  float temperature  = 0;
+  float humidity     = 0;
+  float pressure     = 0;
+  for (uint16_t i=0;i<MULTI_SAMPLE;i++)
   {
     BME280Data* data = bme.read();
     humidity += data -> humidity;
@@ -143,21 +148,23 @@ void loop()
     CO += mq7.readPpm();
     CO2 += mq135.getPPM();
     
-    Wire.beginTransmission(LM75_ADDRESS);
+    Wire.beginTransmission(LM75_PIN);
     Wire.write(0x00); // 温度寄存器地址
     Wire.endTransmission();
-    Wire.requestFrom(LM75_ADDRESS, 2);
+    Wire.requestFrom(LM75_PIN, 2);
     if (Wire.available() >= 2) {
       int16_t rawTemp = (Wire.read() << 8) | Wire.read();
       temperature += rawTemp / 256.0; // 转换为摄氏度
     }
 
   }
-  CO /= 1000;
-  CO2 /= 1000;
-  temperature /= 1000;
-  humidity /= 1000;
-  pressure /= 1000;
+  CO           /= MULTI_SAMPLE;
+  CO2          /= MULTI_SAMPLE;
+  alcohol      /= MULTI_SAMPLE;
+  H2           /= MULTI_SAMPLE;
+  temperature  /= MULTI_SAMPLE;
+  humidity     /= MULTI_SAMPLE;
+  pressure     /= MULTI_SAMPLE;
 
 
   if (CO > CO_MAX_PPM)
@@ -174,7 +181,17 @@ void loop()
   tft.setCursor(152, 462);
   tft.print(CO2);
 
-  if ()
+  if (alcohol > ALCOHOL_LEL)
+    ;
+  else
+    ;
+  
+
+  if (H2 > H2_LEL)
+    ;
+  else
+    ;
+
 
   tft.fillRect(145, 49, 111, 47, 0x00E0);
   tft.setCursor(152, 78);
